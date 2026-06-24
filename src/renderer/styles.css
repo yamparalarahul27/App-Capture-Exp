@@ -316,13 +316,15 @@ p {
   box-shadow: 0 26px 64px rgba(0, 0, 0, 0.22);
 }
 
-.device-screen img {
+.device-screen img,
+.device-screen canvas {
   width: 100%;
   height: 100%;
   object-fit: contain;
   background: #000;
   -webkit-user-select: none;
   user-select: none;
+  touch-action: none;
 }
 
 .device-screen.live {

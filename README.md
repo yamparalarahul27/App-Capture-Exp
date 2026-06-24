@@ -63,14 +63,33 @@ npm test        # run the unit tests (node --test)
 3. Start an AVD or select a connected emulator/device.
 4. Install the APK.
 5. Launch the detected package.
-6. Click `Live` to mirror the device in the app. Click to tap and drag to
-   swipe directly on the preview to navigate to the screen you want (or just
-   use the emulator window).
+6. Click `Live` to mirror the device inside the app and control it with the
+   mouse (click to tap, drag to swipe/scroll). See "Live Engines" below.
 7. Click `Capture`.
 8. Click `Copy SVG`.
 9. Paste into a Figma Design file.
 
 You can also use `Copy PNG` for an exact bitmap capture.
+
+## Live Engines
+
+`Live` mirrors the device inside Appu so you can drive the app without leaving
+the window. Two engines are used automatically:
+
+- **scrcpy** (preferred): real-time H.264 video decoded with WebCodecs, with
+  full mouse control (tap, drag, scroll). Works for emulators and real phones.
+  Requires a scrcpy server jar. The app looks for it via, in order:
+  - `SCRCPY_SERVER_JAR` (explicit path)
+  - `~/.appu/scrcpy-server.jar`
+  - a Homebrew/Linux scrcpy install (`.../share/scrcpy/scrcpy-server`)
+
+  Install with `brew install scrcpy` (macOS) or your package manager. The server
+  version must match; the app auto-detects it from an installed `scrcpy`, or set
+  `SCRCPY_SERVER_VERSION`.
+- **screencap** (fallback): if scrcpy isn't available, Appu falls back to polled
+  `adb exec-out screencap` frames (~1 fps) with tap/swipe forwarding.
+
+The scrcpy engine is experimental and pinned to the v2.x server protocol.
 
 ## How The Capture Works
 
