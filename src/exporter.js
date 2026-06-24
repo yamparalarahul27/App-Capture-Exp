@@ -22,6 +22,15 @@ async function createExportBundle({ capture, outputRoot, packageName }) {
   const hierarchyPath = path.join(outputDir, "hierarchy.xml");
   const svgPath = path.join(outputDir, "figma-capture.svg");
   const jsonPath = path.join(outputDir, "capture.json");
+  const figmaImportPath = path.join(outputDir, "figma-import.json");
+
+  const figmaImport = buildFigmaImport({
+    png: capture.screenshotPng,
+    dimensions,
+    nodes,
+    packageName,
+    capturedAt: capture.capturedAt
+  });
 
   await fs.writeFile(screenshotPath, capture.screenshotPng);
   await fs.writeFile(hierarchyPath, capture.hierarchyXml || "", "utf8");
@@ -33,6 +42,7 @@ async function createExportBundle({ capture, outputRoot, packageName }) {
     nodeCount: nodes.length,
     nodes
   }, null, 2), "utf8");
+  await fs.writeFile(figmaImportPath, JSON.stringify(figmaImport), "utf8");
 
   return {
     outputDir,
@@ -40,9 +50,26 @@ async function createExportBundle({ capture, outputRoot, packageName }) {
     hierarchyPath,
     svgPath,
     jsonPath,
+    figmaImportPath,
     svg,
     screenshotDataUrl: `data:image/png;base64,${capture.screenshotPng.toString("base64")}`,
     dimensions,
+    nodes
+  };
+}
+
+// Self-contained payload for the companion Figma plugin: the screenshot as a
+// data URL plus the extracted nodes, so the plugin can rebuild a real frame
+// with editable text and tap-target layers from a single file.
+function buildFigmaImport({ png, dimensions, nodes, packageName, capturedAt }) {
+  const hasImage = Buffer.isBuffer(png) && png.length > 0;
+  return {
+    format: "app-capture-figma-import",
+    version: 1,
+    packageName: packageName || "Android Capture",
+    capturedAt: capturedAt || "",
+    dimensions,
+    image: hasImage ? `data:image/png;base64,${png.toString("base64")}` : "",
     nodes
   };
 }
@@ -238,5 +265,6 @@ module.exports = {
   createExportBundle,
   parseHierarchy,
   buildSvg,
+  buildFigmaImport,
   readPngDimensions
 };

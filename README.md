@@ -16,6 +16,15 @@ Each capture contains:
 - `hierarchy.xml`: Android UI hierarchy from `uiautomator`.
 - `figma-capture.svg`: screenshot plus editable accessibility text/click-target overlays.
 - `capture.json`: parsed capture metadata.
+- `figma-import.json`: self-contained payload for the companion Figma plugin.
+
+## Two Ways Into Figma
+
+- **Copy SVG → paste** (fastest): a flat screenshot with overlay text/target layers.
+- **Figma plugin** (highest fidelity): rebuilds a real frame sized to the device,
+  with the screenshot as an image fill, editable text layers, and grouped
+  tap-target rectangles. See [`figma-plugin/README.md`](figma-plugin/README.md)
+  for install and usage.
 
 ## Requirements
 

@@ -1,6 +1,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { parseHierarchy, buildSvg, readPngDimensions } = require("../src/exporter");
+const { parseHierarchy, buildSvg, buildFigmaImport, readPngDimensions } = require("../src/exporter");
 
 const SAMPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <hierarchy rotation="0">
@@ -73,4 +73,31 @@ test("readPngDimensions reads PNG IHDR", () => {
 
 test("readPngDimensions returns zeros for non-PNG", () => {
   assert.deepEqual(readPngDimensions(Buffer.from("not a png")), { width: 0, height: 0 });
+});
+
+test("buildFigmaImport embeds image and nodes", () => {
+  const nodes = parseHierarchy(SAMPLE_XML);
+  const out = buildFigmaImport({
+    png: Buffer.from("fake-png-bytes"),
+    dimensions: { width: 1080, height: 2400 },
+    nodes,
+    packageName: "com.example.app",
+    capturedAt: "2026-06-24T00:00:00.000Z"
+  });
+  assert.equal(out.format, "app-capture-figma-import");
+  assert.equal(out.packageName, "com.example.app");
+  assert.match(out.image, /^data:image\/png;base64,/);
+  assert.equal(out.nodes.length, nodes.length);
+});
+
+test("buildFigmaImport leaves image empty when no png", () => {
+  const out = buildFigmaImport({
+    png: Buffer.alloc(0),
+    dimensions: { width: 10, height: 10 },
+    nodes: [],
+    packageName: "",
+    capturedAt: ""
+  });
+  assert.equal(out.image, "");
+  assert.equal(out.packageName, "Android Capture");
 });

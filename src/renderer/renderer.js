@@ -357,7 +357,8 @@ function renderCapture(bundle) {
   elements.fileList.replaceChildren(
     fileRow("SVG", bundle.svgPath),
     fileRow("PNG", bundle.screenshotPath),
-    fileRow("XML", bundle.hierarchyPath)
+    fileRow("XML", bundle.hierarchyPath),
+    fileRow("Figma JSON", bundle.figmaImportPath)
   );
 }
 
