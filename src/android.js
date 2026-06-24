@@ -88,6 +88,21 @@ class AndroidController {
   async launchApp({ packageName, serial }) {
     assertTool(this.tools.adb, "adb");
     if (!packageName) throw new Error("Package name is required to launch the app.");
+
+    // Preferred path: resolve the launchable activity and start it explicitly.
+    // `am start` surfaces real errors, unlike monkey which exits 0 even when it
+    // finds no launchable activity.
+    const activity = await this.resolveLaunchActivity(packageName, serial);
+    if (activity) {
+      const result = await this.adb(serial, ["shell", "am", "start", "-n", activity], {
+        allowFailure: true
+      });
+      if (result.code === 0 && !/error/i.test(result.stdout + result.stderr)) {
+        return { stdout: result.stdout, stderr: result.stderr, activity };
+      }
+    }
+
+    // Fallback: monkey launcher intent.
     const result = await this.adb(serial, [
       "shell",
       "monkey",
@@ -98,6 +113,22 @@ class AndroidController {
       "1"
     ]);
     return { stdout: result.stdout, stderr: result.stderr };
+  }
+
+  async resolveLaunchActivity(packageName, serial) {
+    const result = await this.adb(
+      serial,
+      ["shell", "cmd", "package", "resolve-activity", "--brief", packageName],
+      { allowFailure: true }
+    );
+    if (result.code !== 0) return null;
+    // Last non-empty line is the component, e.g. com.example/.MainActivity
+    const component = result.stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .pop();
+    return component && component.includes("/") ? component : null;
   }
 
   async capture({ serial }) {
@@ -157,10 +188,16 @@ function resolveAndroidTools() {
 }
 
 function resolveSdkRoot() {
+  const home = os.homedir();
   const candidates = [
     process.env.ANDROID_HOME,
     process.env.ANDROID_SDK_ROOT,
-    path.join(os.homedir(), "Library", "Android", "sdk")
+    // macOS default
+    path.join(home, "Library", "Android", "sdk"),
+    // Linux default
+    path.join(home, "Android", "Sdk"),
+    // Windows default
+    process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, "Android", "Sdk")
   ].filter(Boolean);
   return candidates.find((candidate) => fs.existsSync(candidate)) || null;
 }
@@ -175,9 +212,22 @@ function buildToolCandidates(sdkRoot, name) {
 }
 
 function findExecutable(name, candidates = []) {
+  // On Windows the SDK ships .exe / .bat wrappers; probe those names too.
+  const names = process.platform === "win32"
+    ? [name, `${name}.exe`, `${name}.bat`]
+    : [name];
+
+  // GUI-launched apps (especially on macOS) often inherit a truncated PATH, so
+  // never assume process.env.PATH is set.
+  const pathDirs = (process.env.PATH || "").split(path.delimiter).filter(Boolean);
+
+  const explicit = process.platform === "win32"
+    ? candidates.filter(Boolean).flatMap((c) => [c, `${c}.exe`, `${c}.bat`])
+    : candidates.filter(Boolean);
+
   const allCandidates = [
-    ...candidates.filter(Boolean),
-    ...process.env.PATH.split(path.delimiter).map((entry) => path.join(entry, name))
+    ...explicit,
+    ...pathDirs.flatMap((entry) => names.map((n) => path.join(entry, n)))
   ];
   return allCandidates.find((candidate) => candidate && fs.existsSync(candidate)) || null;
 }

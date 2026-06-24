@@ -6,6 +6,7 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
+    "test": "node --test",
     "check": "node --check src/main.js && node --check src/android.js && node --check src/exporter.js && node --check src/preload.js && node --check src/renderer/renderer.js"
   },
   "devDependencies": {

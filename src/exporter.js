@@ -55,18 +55,21 @@ function buildSvg({ png, dimensions, nodes, packageName, capturedAt }) {
   const subtitle = escapeXml(capturedAt || "");
   const textNodes = nodes.filter((node) => node.label);
   const tappableNodes = nodes.filter((node) => node.clickable && !node.label);
+  const nameLayer = uniqueNamer();
 
   const textMarkup = textNodes.map((node) => {
     const fontSize = Math.max(10, Math.min(22, Math.round(node.bounds.height * 0.45)));
     const y = node.bounds.y + Math.max(fontSize, Math.round(node.bounds.height * 0.72));
+    const name = nameLayer(figmaLayerName(node, "text"));
     return [
-      `<rect id="${escapeXml(node.id)}-hitbox" x="${node.bounds.x}" y="${node.bounds.y}" width="${node.bounds.width}" height="${node.bounds.height}" rx="4" fill="#2563eb" opacity="0.08" stroke="#2563eb" stroke-width="1"/>`,
-      `<text id="${escapeXml(node.id)}" x="${node.bounds.x + 2}" y="${y}" font-family="Inter, Arial, sans-serif" font-size="${fontSize}" fill="#1d4ed8">${escapeXml(node.label)}</text>`
+      `<rect id="${escapeXml(name)}-bounds" x="${node.bounds.x}" y="${node.bounds.y}" width="${node.bounds.width}" height="${node.bounds.height}" rx="4" fill="#2563eb" opacity="0.08" stroke="#2563eb" stroke-width="1"/>`,
+      `<text id="${escapeXml(name)}" x="${node.bounds.x + 2}" y="${y}" font-family="Inter, Arial, sans-serif" font-size="${fontSize}" fill="#1d4ed8">${escapeXml(node.label)}</text>`
     ].join("\n");
   }).join("\n");
 
   const targetMarkup = tappableNodes.map((node) => {
-    return `<rect id="${escapeXml(node.id)}" x="${node.bounds.x}" y="${node.bounds.y}" width="${node.bounds.width}" height="${node.bounds.height}" rx="6" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="5 5" opacity="0.8"/>`;
+    const name = nameLayer(figmaLayerName(node, "tap-target"));
+    return `<rect id="${escapeXml(name)}" x="${node.bounds.x}" y="${node.bounds.y}" width="${node.bounds.width}" height="${node.bounds.height}" rx="6" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="5 5" opacity="0.8"/>`;
   }).join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -201,6 +204,34 @@ function toFileTimestamp(date) {
 
 function sanitizeFileName(value) {
   return String(value).replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "capture";
+}
+
+// Figma names a pasted SVG layer after its element `id`. Build a readable,
+// valid id (no spaces, starts with a letter) from the most meaningful source.
+function figmaLayerName(node, fallback) {
+  const fromResource = node.resourceId ? node.resourceId.split("/").pop() : "";
+  const base = fromResource || node.label || shortClassName(node.className) || fallback;
+  const slug = String(base)
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+  return /^[a-zA-Z]/.test(slug) ? slug : `${fallback}-${slug}`.replace(/-+$/g, "");
+}
+
+function shortClassName(className) {
+  if (!className) return "";
+  return className.split(".").pop();
+}
+
+function uniqueNamer() {
+  const counts = new Map();
+  return (base) => {
+    const safe = base || "layer";
+    const n = counts.get(safe) || 0;
+    counts.set(safe, n + 1);
+    return n === 0 ? safe : `${safe}-${n + 1}`;
+  };
 }
 
 module.exports = {

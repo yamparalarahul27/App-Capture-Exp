@@ -1,6 +1,6 @@
 # App Capture
 
-Local macOS desktop app for running a downloaded Android APK in an emulator, capturing the current screen, and exporting a Figma-pasteable SVG bundle.
+Local desktop app for running a downloaded Android APK in an emulator, capturing the current screen, and exporting a Figma-pasteable SVG bundle. Built on Electron; the macOS UI follows Apple's Human Interface Guidelines, and tool discovery works on macOS, Linux, and Windows.
 
 ## What It Builds
 
@@ -19,7 +19,7 @@ Each capture contains:
 
 ## Requirements
 
-- macOS
+- macOS, Linux, or Windows
 - Node.js 22+
 - Android Studio or Android SDK command-line tools
 - At least one Android Virtual Device
@@ -28,7 +28,9 @@ The app searches for Android tools in:
 
 - `$ANDROID_HOME`
 - `$ANDROID_SDK_ROOT`
-- `~/Library/Android/sdk`
+- `~/Library/Android/sdk` (macOS)
+- `~/Android/Sdk` (Linux)
+- `%LOCALAPPDATA%\Android\Sdk` (Windows)
 - current `PATH`
 
 ## Run
@@ -36,6 +38,13 @@ The app searches for Android tools in:
 ```bash
 npm install
 npm start
+```
+
+## Develop
+
+```bash
+npm run check   # syntax-check every source file
+npm test        # run the unit tests (node --test)
 ```
 
 ## Workflow

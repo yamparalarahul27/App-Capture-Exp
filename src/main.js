@@ -138,10 +138,10 @@ ipcMain.handle("android:capture", async (_event, payload) => {
 
 ipcMain.handle("clipboard:copy-svg", async (_event, svg) => {
   try {
-    clipboard.write({
-      text: svg,
-      html: svg
-    });
+    // Figma (and most vector tools) create editable layers from SVG *source*
+    // pasted as plain text. Writing the same markup to the HTML clipboard makes
+    // some paste targets render it as escaped source instead, so keep text only.
+    clipboard.writeText(svg);
     return { ok: true };
   } catch (error) {
     return wrapError(error);
