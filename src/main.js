@@ -121,6 +121,23 @@ ipcMain.handle("android:launch-app", async (_event, payload) => {
   }
 });
 
+ipcMain.handle("android:capture-frame", async (_event, payload) => {
+  try {
+    const png = await android.captureFrame(payload);
+    return { ok: true, dataUrl: `data:image/png;base64,${png.toString("base64")}` };
+  } catch (error) {
+    return wrapError(error);
+  }
+});
+
+ipcMain.handle("android:input", async (_event, payload) => {
+  try {
+    return { ok: true, result: await android.input(payload) };
+  } catch (error) {
+    return wrapError(error);
+  }
+});
+
 ipcMain.handle("android:capture", async (_event, payload) => {
   try {
     const capture = await android.capture(payload);

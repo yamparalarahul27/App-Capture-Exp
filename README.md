@@ -54,7 +54,9 @@ npm test        # run the unit tests (node --test)
 3. Start an AVD or select a connected emulator/device.
 4. Install the APK.
 5. Launch the detected package.
-6. Use the emulator normally.
+6. Click `Live` to mirror the device in the app. Click to tap and drag to
+   swipe directly on the preview to navigate to the screen you want (or just
+   use the emulator window).
 7. Click `Capture`.
 8. Click `Copy SVG`.
 9. Paste into a Figma Design file.

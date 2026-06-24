@@ -3,8 +3,13 @@ const state = {
   packageName: "",
   devices: [],
   avds: [],
-  latestBundle: null
+  latestBundle: null,
+  live: false,
+  liveTimer: null
 };
+
+const LIVE_INTERVAL_MS = 900;
+const TAP_THRESHOLD_PX = 8;
 
 const elements = {
   systemSummary: document.getElementById("systemSummary"),
@@ -20,6 +25,7 @@ const elements = {
   installButton: document.getElementById("installButton"),
   launchButton: document.getElementById("launchButton"),
   captureButton: document.getElementById("captureButton"),
+  liveButton: document.getElementById("liveButton"),
   captureMeta: document.getElementById("captureMeta"),
   deviceScreen: document.getElementById("deviceScreen"),
   copySvgButton: document.getElementById("copySvgButton"),
@@ -42,11 +48,18 @@ function bindEvents() {
   elements.installButton.addEventListener("click", installApk);
   elements.launchButton.addEventListener("click", launchApp);
   elements.captureButton.addEventListener("click", captureScreen);
+  elements.liveButton.addEventListener("click", toggleLive);
   elements.copySvgButton.addEventListener("click", copySvg);
   elements.copyPngButton.addEventListener("click", copyPng);
   elements.showSvgButton.addEventListener("click", showFiles);
   elements.packageName.addEventListener("input", () => {
     state.packageName = elements.packageName.value.trim();
+  });
+  elements.deviceSelect.addEventListener("change", () => {
+    if (state.live) {
+      stopLive();
+      log("Live preview stopped (device changed)");
+    }
   });
 }
 
@@ -172,6 +185,122 @@ async function launchApp() {
   log("App launched");
 }
 
+function toggleLive() {
+  if (state.live) {
+    stopLive();
+    return;
+  }
+  if (!selectedDevice()) {
+    log("Select a device first", "error");
+    return;
+  }
+  state.live = true;
+  elements.liveButton.classList.add("active");
+  elements.deviceScreen.classList.add("live");
+  log("Live preview started");
+  liveLoop();
+}
+
+function stopLive() {
+  state.live = false;
+  if (state.liveTimer) window.clearTimeout(state.liveTimer);
+  state.liveTimer = null;
+  elements.liveButton.classList.remove("active");
+  elements.deviceScreen.classList.remove("live");
+}
+
+async function liveLoop() {
+  if (!state.live) return;
+  await pollFrame();
+  if (state.live) {
+    state.liveTimer = window.setTimeout(liveLoop, LIVE_INTERVAL_MS);
+  }
+}
+
+async function pollFrame() {
+  const serial = selectedDevice();
+  if (!serial) {
+    stopLive();
+    return;
+  }
+  const response = await window.appCapture.captureFrame({ serial });
+  if (!response.ok) {
+    log(response.error, "error");
+    stopLive();
+    return;
+  }
+  ensurePreviewImage().src = response.dataUrl;
+}
+
+function ensurePreviewImage() {
+  let img = elements.deviceScreen.querySelector("img");
+  if (!img) {
+    img = document.createElement("img");
+    img.alt = "Android device screen";
+    img.draggable = false;
+    elements.deviceScreen.replaceChildren(img);
+    bindScreenInteractions(img);
+  }
+  return img;
+}
+
+function bindScreenInteractions(img) {
+  let start = null;
+  img.addEventListener("pointerdown", (event) => {
+    if (!state.live) return;
+    start = { x: event.clientX, y: event.clientY, t: event.timeStamp };
+  });
+  img.addEventListener("pointerup", async (event) => {
+    if (!state.live || !start) return;
+    const begin = mapPointToImage(start.x, start.y, img);
+    const end = mapPointToImage(event.clientX, event.clientY, img);
+    const moved = Math.hypot(event.clientX - start.x, event.clientY - start.y);
+    const duration = Math.max(20, event.timeStamp - start.t);
+    start = null;
+    if (!begin.inBounds) return;
+
+    const serial = selectedDevice();
+    const response = moved < TAP_THRESHOLD_PX
+      ? await window.appCapture.input({ serial, action: "tap", params: { x: begin.x, y: begin.y } })
+      : await window.appCapture.input({ serial, action: "swipe", params: { x1: begin.x, y1: begin.y, x2: end.x, y2: end.y, duration } });
+
+    if (!response.ok) {
+      log(response.error, "error");
+      return;
+    }
+    // Refresh promptly so the UI reflects the gesture without waiting a full tick.
+    if (state.live) pollFrame();
+  });
+}
+
+// Map a viewport point to device pixels, accounting for object-fit: contain
+// letterboxing of the screenshot inside the device frame.
+function mapPointToImage(clientX, clientY, img) {
+  const rect = img.getBoundingClientRect();
+  const naturalWidth = img.naturalWidth;
+  const naturalHeight = img.naturalHeight;
+  if (!naturalWidth || !naturalHeight || !rect.width || !rect.height) {
+    return { x: 0, y: 0, inBounds: false };
+  }
+  const naturalRatio = naturalWidth / naturalHeight;
+  const boxRatio = rect.width / rect.height;
+  let renderWidth;
+  let renderHeight;
+  if (naturalRatio > boxRatio) {
+    renderWidth = rect.width;
+    renderHeight = rect.width / naturalRatio;
+  } else {
+    renderHeight = rect.height;
+    renderWidth = rect.height * naturalRatio;
+  }
+  const offsetX = (rect.width - renderWidth) / 2;
+  const offsetY = (rect.height - renderHeight) / 2;
+  const x = (clientX - rect.left - offsetX) / renderWidth * naturalWidth;
+  const y = (clientY - rect.top - offsetY) / renderHeight * naturalHeight;
+  const inBounds = x >= 0 && y >= 0 && x <= naturalWidth && y <= naturalHeight;
+  return { x, y, inBounds };
+}
+
 async function captureScreen() {
   syncPackageName();
   setBusy(elements.captureButton, true);
@@ -218,10 +347,7 @@ async function showFiles() {
 }
 
 function renderCapture(bundle) {
-  const image = document.createElement("img");
-  image.alt = "Latest Android screen capture";
-  image.src = bundle.screenshotDataUrl;
-  elements.deviceScreen.replaceChildren(image);
+  ensurePreviewImage().src = bundle.screenshotDataUrl;
   elements.captureMeta.textContent = `${bundle.dimensions.width} x ${bundle.dimensions.height} - ${bundle.nodes.length} extracted nodes`;
 
   elements.copySvgButton.disabled = false;

@@ -131,6 +131,25 @@ class AndroidController {
     return component && component.includes("/") ? component : null;
   }
 
+  // Lightweight single frame for the live preview: screenshot only, no
+  // hierarchy dump and no disk writes, so it can be polled cheaply.
+  async captureFrame({ serial }) {
+    assertTool(this.tools.adb, "adb");
+    const screenshot = await this.adb(serial, ["exec-out", "screencap", "-p"], {
+      binary: true,
+      timeout: 15000
+    });
+    return screenshot.stdout;
+  }
+
+  // Forward a user gesture to the device via `adb shell input`.
+  async input({ serial, action, params }) {
+    assertTool(this.tools.adb, "adb");
+    const args = buildInputArgs(action, params);
+    const result = await this.adb(serial, ["shell", ...args], { allowFailure: true });
+    return { code: result.code, stdout: result.stdout, stderr: result.stderr };
+  }
+
   async capture({ serial }) {
     assertTool(this.tools.adb, "adb");
     const screenshot = await this.adb(serial, ["exec-out", "screencap", "-p"], {
@@ -278,6 +297,26 @@ function run(command, args, options = {}) {
   });
 }
 
+function buildInputArgs(action, params = {}) {
+  const round = (value) => String(Math.round(Number(value) || 0));
+  if (action === "tap") {
+    return ["input", "tap", round(params.x), round(params.y)];
+  }
+  if (action === "swipe") {
+    const duration = Math.max(20, Math.round(Number(params.duration) || 200));
+    return [
+      "input", "swipe",
+      round(params.x1), round(params.y1),
+      round(params.x2), round(params.y2),
+      String(duration)
+    ];
+  }
+  if (action === "key") {
+    return ["input", "keyevent", String(params.keycode)];
+  }
+  throw new Error(`Unsupported input action: ${action}`);
+}
+
 function parseDevices(output) {
   return output
     .split(/\r?\n/)
@@ -295,4 +334,4 @@ function inferInstalledPackage(before, after) {
   return after.find((packageName) => !beforeSet.has(packageName)) || null;
 }
 
-module.exports = { AndroidController, resolveAndroidTools, parseDevices };
+module.exports = { AndroidController, resolveAndroidTools, parseDevices, buildInputArgs };

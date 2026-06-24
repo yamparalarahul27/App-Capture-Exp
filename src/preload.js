@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld("appCapture", {
   listDevices: () => ipcRenderer.invoke("android:list-devices"),
   installApk: (payload) => ipcRenderer.invoke("android:install-apk", payload),
   launchApp: (payload) => ipcRenderer.invoke("android:launch-app", payload),
+  captureFrame: (payload) => ipcRenderer.invoke("android:capture-frame", payload),
+  input: (payload) => ipcRenderer.invoke("android:input", payload),
   capture: (payload) => ipcRenderer.invoke("android:capture", payload),
   copySvg: (svg) => ipcRenderer.invoke("clipboard:copy-svg", svg),
   copyPng: (filePath) => ipcRenderer.invoke("clipboard:copy-png", filePath),
