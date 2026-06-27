@@ -1,0 +1,12 @@
+{
+  "name": "App Capture Layout Importer",
+  "id": "app-capture-layout-importer",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["none"]
+  }
+}

@@ -23,6 +23,7 @@ const elements = {
   captureMeta: document.getElementById("captureMeta"),
   deviceScreen: document.getElementById("deviceScreen"),
   copySvgButton: document.getElementById("copySvgButton"),
+  copyJsonButton: document.getElementById("copyJsonButton"),
   copyPngButton: document.getElementById("copyPngButton"),
   showSvgButton: document.getElementById("showSvgButton"),
   fileList: document.getElementById("fileList"),
@@ -43,6 +44,7 @@ function bindEvents() {
   elements.launchButton.addEventListener("click", launchApp);
   elements.captureButton.addEventListener("click", captureScreen);
   elements.copySvgButton.addEventListener("click", copySvg);
+  elements.copyJsonButton.addEventListener("click", copyJson);
   elements.copyPngButton.addEventListener("click", copyPng);
   elements.showSvgButton.addEventListener("click", showFiles);
   elements.packageName.addEventListener("input", () => {
@@ -201,6 +203,16 @@ async function copySvg() {
   log("SVG copied");
 }
 
+async function copyJson() {
+  if (!state.latestBundle || !state.latestBundle.layoutJson) return;
+  const response = await window.appCapture.copyJson(state.latestBundle.layoutJson);
+  if (!response.ok) {
+    log(response.error, "error");
+    return;
+  }
+  log("Layout JSON copied - paste into the App Capture Figma plugin");
+}
+
 async function copyPng() {
   if (!state.latestBundle) return;
   const response = await window.appCapture.copyPng(state.latestBundle.screenshotPath);
@@ -225,11 +237,13 @@ function renderCapture(bundle) {
   elements.captureMeta.textContent = `${bundle.dimensions.width} x ${bundle.dimensions.height} - ${bundle.nodes.length} extracted nodes`;
 
   elements.copySvgButton.disabled = false;
+  elements.copyJsonButton.disabled = !bundle.layoutJson;
   elements.copyPngButton.disabled = false;
   elements.showSvgButton.disabled = false;
 
   elements.fileList.replaceChildren(
     fileRow("SVG", bundle.svgPath),
+    fileRow("JSON", bundle.layoutPath),
     fileRow("PNG", bundle.screenshotPath),
     fileRow("XML", bundle.hierarchyPath)
   );

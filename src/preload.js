@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld("appCapture", {
   launchApp: (payload) => ipcRenderer.invoke("android:launch-app", payload),
   capture: (payload) => ipcRenderer.invoke("android:capture", payload),
   copySvg: (svg) => ipcRenderer.invoke("clipboard:copy-svg", svg),
+  copyJson: (json) => ipcRenderer.invoke("clipboard:copy-json", json),
   copyPng: (filePath) => ipcRenderer.invoke("clipboard:copy-png", filePath),
   showFile: (filePath) => ipcRenderer.invoke("file:show", filePath)
 });

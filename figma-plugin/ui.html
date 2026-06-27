@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        height: 100vh;
+        box-sizing: border-box;
+        background: var(--figma-color-bg, #fff);
+        color: var(--figma-color-text, #1d1d1f);
+      }
+      p.hint {
+        margin: 0;
+        font-size: 11px;
+        line-height: 1.4;
+        opacity: 0.75;
+      }
+      textarea {
+        flex: 1;
+        resize: none;
+        width: 100%;
+        box-sizing: border-box;
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 11px;
+        line-height: 1.4;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid var(--figma-color-border, #e6e6e6);
+        background: var(--figma-color-bg-secondary, #f5f5f5);
+        color: inherit;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      button {
+        flex: 1;
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: none;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button.primary {
+        background: #0d99ff;
+        color: #fff;
+      }
+      button.secondary {
+        background: var(--figma-color-bg-secondary, #ececec);
+        color: inherit;
+      }
+      label.file {
+        font-size: 11px;
+        opacity: 0.85;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      input[type="file"] {
+        display: none;
+      }
+      #status {
+        font-size: 11px;
+        min-height: 14px;
+      }
+      #status.error {
+        color: #e5484d;
+      }
+      #status.ok {
+        color: #30a46c;
+      }
+    </style>
+  </head>
+  <body>
+    <p class="hint">
+      Paste the contents of <strong>layout.json</strong> (the desktop app's
+      "Copy Layout JSON" button), or load the file, then Build.
+    </p>
+    <textarea id="json" placeholder="Paste layout.json here…" spellcheck="false"></textarea>
+    <div class="row">
+      <label class="file" for="file">📂 Load file…</label>
+      <input type="file" id="file" accept="application/json,.json" />
+    </div>
+    <div id="status"></div>
+    <div class="row">
+      <button class="secondary" id="closeBtn">Close</button>
+      <button class="primary" id="buildBtn">Build in Figma</button>
+    </div>
+
+    <script>
+      const jsonEl = document.getElementById("json");
+      const statusEl = document.getElementById("status");
+
+      function setStatus(message, kind) {
+        statusEl.textContent = message || "";
+        statusEl.className = kind || "";
+      }
+
+      document.getElementById("buildBtn").onclick = () => {
+        const json = jsonEl.value.trim();
+        if (!json) {
+          setStatus("Paste layout.json first.", "error");
+          return;
+        }
+        setStatus("Building…", "");
+        parent.postMessage({ pluginMessage: { type: "build", json } }, "*");
+      };
+
+      document.getElementById("closeBtn").onclick = () => {
+        parent.postMessage({ pluginMessage: { type: "close" } }, "*");
+      };
+
+      document.getElementById("file").onchange = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          jsonEl.value = reader.result;
+          setStatus(`Loaded ${file.name}`, "ok");
+        };
+        reader.readAsText(file);
+      };
+
+      onmessage = (event) => {
+        const msg = event.data.pluginMessage;
+        if (!msg) return;
+        if (msg.type === "done") setStatus(`Built "${msg.name}". ✓`, "ok");
+        if (msg.type === "error") setStatus(msg.message, "error");
+      };
+    </script>
+  </body>
+</html>
