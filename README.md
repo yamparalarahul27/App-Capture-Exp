@@ -1,6 +1,6 @@
 # App Capture
 
-Local macOS desktop app for running a downloaded Android APK in an emulator, capturing the current screen, and exporting a Figma-pasteable SVG bundle.
+Local desktop app for running a downloaded Android APK in an emulator, capturing the current screen, and exporting a Figma-pasteable SVG bundle. Built on Electron; the macOS UI follows Apple's Human Interface Guidelines, and tool discovery works on macOS, Linux, and Windows.
 
 ## What It Builds
 
@@ -16,10 +16,19 @@ Each capture contains:
 - `hierarchy.xml`: Android UI hierarchy from `uiautomator`.
 - `figma-capture.svg`: screenshot plus editable accessibility text/click-target overlays.
 - `capture.json`: parsed capture metadata.
+- `figma-import.json`: self-contained payload for the companion Figma plugin.
+
+## Two Ways Into Figma
+
+- **Copy SVG → paste** (fastest): a flat screenshot with overlay text/target layers.
+- **Figma plugin** (highest fidelity): rebuilds a real frame sized to the device,
+  with the screenshot as an image fill, editable text layers, and grouped
+  tap-target rectangles. See [`figma-plugin/README.md`](figma-plugin/README.md)
+  for install and usage.
 
 ## Requirements
 
-- macOS
+- macOS, Linux, or Windows
 - Node.js 22+
 - Android Studio or Android SDK command-line tools
 - At least one Android Virtual Device
@@ -28,7 +37,9 @@ The app searches for Android tools in:
 
 - `$ANDROID_HOME`
 - `$ANDROID_SDK_ROOT`
-- `~/Library/Android/sdk`
+- `~/Library/Android/sdk` (macOS)
+- `~/Android/Sdk` (Linux)
+- `%LOCALAPPDATA%\Android\Sdk` (Windows)
 - current `PATH`
 
 ## Run
@@ -38,6 +49,13 @@ npm install
 npm start
 ```
 
+## Develop
+
+```bash
+npm run check   # syntax-check every source file
+npm test        # run the unit tests (node --test)
+```
+
 ## Workflow
 
 1. Start the app.
@@ -45,12 +63,33 @@ npm start
 3. Start an AVD or select a connected emulator/device.
 4. Install the APK.
 5. Launch the detected package.
-6. Use the emulator normally.
+6. Click `Live` to mirror the device inside the app and control it with the
+   mouse (click to tap, drag to swipe/scroll). See "Live Engines" below.
 7. Click `Capture`.
 8. Click `Copy SVG`.
 9. Paste into a Figma Design file.
 
 You can also use `Copy PNG` for an exact bitmap capture.
+
+## Live Engines
+
+`Live` mirrors the device inside Appu so you can drive the app without leaving
+the window. Two engines are used automatically:
+
+- **scrcpy** (preferred): real-time H.264 video decoded with WebCodecs, with
+  full mouse control (tap, drag, scroll). Works for emulators and real phones.
+  Requires a scrcpy server jar. The app looks for it via, in order:
+  - `SCRCPY_SERVER_JAR` (explicit path)
+  - `~/.appu/scrcpy-server.jar`
+  - a Homebrew/Linux scrcpy install (`.../share/scrcpy/scrcpy-server`)
+
+  Install with `brew install scrcpy` (macOS) or your package manager. The server
+  version must match; the app auto-detects it from an installed `scrcpy`, or set
+  `SCRCPY_SERVER_VERSION`.
+- **screencap** (fallback): if scrcpy isn't available, Appu falls back to polled
+  `adb exec-out screencap` frames (~1 fps) with tap/swipe forwarding.
+
+The scrcpy engine is experimental and pinned to the v2.x server protocol.
 
 ## How The Capture Works
 

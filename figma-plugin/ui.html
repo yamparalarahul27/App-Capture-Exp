@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        margin: 0;
+        padding: 16px;
+        font: 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #1c1c1e;
+        background: #fff;
+      }
+      @media (prefers-color-scheme: dark) {
+        body { color: #f5f5f7; background: #2c2c2e; }
+        .drop { border-color: #555; }
+      }
+      h1 { margin: 0 0 4px; font-size: 13px; }
+      p.hint { margin: 0 0 12px; opacity: 0.7; }
+      .drop {
+        display: block;
+        border: 1px dashed #c4c4c6;
+        border-radius: 8px;
+        padding: 14px;
+        text-align: center;
+        cursor: pointer;
+      }
+      .row { display: flex; gap: 8px; margin-top: 12px; }
+      button {
+        flex: 1;
+        min-height: 30px;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        font: inherit;
+        cursor: pointer;
+      }
+      #import { background: #0d99ff; color: #fff; }
+      #import:disabled { background: #9bd0ff; cursor: not-allowed; }
+      #cancel { background: transparent; border-color: #c4c4c6; color: inherit; }
+      #status { margin-top: 10px; min-height: 16px; opacity: 0.8; }
+    </style>
+  </head>
+  <body>
+    <h1>App Capture Import</h1>
+    <p class="hint">Select the <code>figma-import.json</code> exported by App Capture.</p>
+
+    <label class="drop">
+      <input id="file" type="file" accept="application/json,.json" hidden />
+      <span id="fileLabel">Choose figma-import.json</span>
+    </label>
+
+    <div class="row">
+      <button id="import" disabled>Import</button>
+      <button id="cancel">Cancel</button>
+    </div>
+    <div id="status"></div>
+
+    <script>
+      let payload = null;
+      let imageBytes = null;
+
+      const fileEl = document.getElementById("file");
+      const fileLabel = document.getElementById("fileLabel");
+      const importBtn = document.getElementById("import");
+      const statusEl = document.getElementById("status");
+
+      fileEl.addEventListener("change", () => {
+        const file = fileEl.files && fileEl.files[0];
+        if (!file) return;
+        fileLabel.textContent = file.name;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const parsed = JSON.parse(reader.result);
+            payload = {
+              packageName: parsed.packageName,
+              capturedAt: parsed.capturedAt,
+              dimensions: parsed.dimensions,
+              nodes: Array.isArray(parsed.nodes) ? parsed.nodes : []
+            };
+            imageBytes = parsed.image ? dataUrlToBytes(parsed.image) : null;
+            importBtn.disabled = false;
+            statusEl.textContent = payload.nodes.length + " nodes ready";
+          } catch (error) {
+            payload = null;
+            importBtn.disabled = true;
+            statusEl.textContent = "Invalid file: " + error.message;
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      importBtn.addEventListener("click", () => {
+        if (!payload) return;
+        parent.postMessage(
+          { pluginMessage: { type: "import", payload: payload, image: imageBytes } },
+          "*"
+        );
+      });
+
+      document.getElementById("cancel").addEventListener("click", () => {
+        parent.postMessage({ pluginMessage: { type: "cancel" } }, "*");
+      });
+
+      function dataUrlToBytes(dataUrl) {
+        const base64 = (dataUrl.split(",")[1] || "");
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+      }
+    </script>
+  </body>
+</html>

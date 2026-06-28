@@ -88,6 +88,21 @@ class AndroidController {
   async launchApp({ packageName, serial }) {
     assertTool(this.tools.adb, "adb");
     if (!packageName) throw new Error("Package name is required to launch the app.");
+
+    // Preferred path: resolve the launchable activity and start it explicitly.
+    // `am start` surfaces real errors, unlike monkey which exits 0 even when it
+    // finds no launchable activity.
+    const activity = await this.resolveLaunchActivity(packageName, serial);
+    if (activity) {
+      const result = await this.adb(serial, ["shell", "am", "start", "-n", activity], {
+        allowFailure: true
+      });
+      if (result.code === 0 && !/error/i.test(result.stdout + result.stderr)) {
+        return { stdout: result.stdout, stderr: result.stderr, activity };
+      }
+    }
+
+    // Fallback: monkey launcher intent.
     const result = await this.adb(serial, [
       "shell",
       "monkey",
@@ -98,6 +113,41 @@ class AndroidController {
       "1"
     ]);
     return { stdout: result.stdout, stderr: result.stderr };
+  }
+
+  async resolveLaunchActivity(packageName, serial) {
+    const result = await this.adb(
+      serial,
+      ["shell", "cmd", "package", "resolve-activity", "--brief", packageName],
+      { allowFailure: true }
+    );
+    if (result.code !== 0) return null;
+    // Last non-empty line is the component, e.g. com.example/.MainActivity
+    const component = result.stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .pop();
+    return component && component.includes("/") ? component : null;
+  }
+
+  // Lightweight single frame for the live preview: screenshot only, no
+  // hierarchy dump and no disk writes, so it can be polled cheaply.
+  async captureFrame({ serial }) {
+    assertTool(this.tools.adb, "adb");
+    const screenshot = await this.adb(serial, ["exec-out", "screencap", "-p"], {
+      binary: true,
+      timeout: 15000
+    });
+    return screenshot.stdout;
+  }
+
+  // Forward a user gesture to the device via `adb shell input`.
+  async input({ serial, action, params }) {
+    assertTool(this.tools.adb, "adb");
+    const args = buildInputArgs(action, params);
+    const result = await this.adb(serial, ["shell", ...args], { allowFailure: true });
+    return { code: result.code, stdout: result.stdout, stderr: result.stderr };
   }
 
   async capture({ serial }) {
@@ -157,10 +207,16 @@ function resolveAndroidTools() {
 }
 
 function resolveSdkRoot() {
+  const home = os.homedir();
   const candidates = [
     process.env.ANDROID_HOME,
     process.env.ANDROID_SDK_ROOT,
-    path.join(os.homedir(), "Library", "Android", "sdk")
+    // macOS default
+    path.join(home, "Library", "Android", "sdk"),
+    // Linux default
+    path.join(home, "Android", "Sdk"),
+    // Windows default
+    process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, "Android", "Sdk")
   ].filter(Boolean);
   return candidates.find((candidate) => fs.existsSync(candidate)) || null;
 }
@@ -175,9 +231,22 @@ function buildToolCandidates(sdkRoot, name) {
 }
 
 function findExecutable(name, candidates = []) {
+  // On Windows the SDK ships .exe / .bat wrappers; probe those names too.
+  const names = process.platform === "win32"
+    ? [name, `${name}.exe`, `${name}.bat`]
+    : [name];
+
+  // GUI-launched apps (especially on macOS) often inherit a truncated PATH, so
+  // never assume process.env.PATH is set.
+  const pathDirs = (process.env.PATH || "").split(path.delimiter).filter(Boolean);
+
+  const explicit = process.platform === "win32"
+    ? candidates.filter(Boolean).flatMap((c) => [c, `${c}.exe`, `${c}.bat`])
+    : candidates.filter(Boolean);
+
   const allCandidates = [
-    ...candidates.filter(Boolean),
-    ...process.env.PATH.split(path.delimiter).map((entry) => path.join(entry, name))
+    ...explicit,
+    ...pathDirs.flatMap((entry) => names.map((n) => path.join(entry, n)))
   ];
   return allCandidates.find((candidate) => candidate && fs.existsSync(candidate)) || null;
 }
@@ -228,6 +297,26 @@ function run(command, args, options = {}) {
   });
 }
 
+function buildInputArgs(action, params = {}) {
+  const round = (value) => String(Math.round(Number(value) || 0));
+  if (action === "tap") {
+    return ["input", "tap", round(params.x), round(params.y)];
+  }
+  if (action === "swipe") {
+    const duration = Math.max(20, Math.round(Number(params.duration) || 200));
+    return [
+      "input", "swipe",
+      round(params.x1), round(params.y1),
+      round(params.x2), round(params.y2),
+      String(duration)
+    ];
+  }
+  if (action === "key") {
+    return ["input", "keyevent", String(params.keycode)];
+  }
+  throw new Error(`Unsupported input action: ${action}`);
+}
+
 function parseDevices(output) {
   return output
     .split(/\r?\n/)
@@ -245,4 +334,4 @@ function inferInstalledPackage(before, after) {
   return after.find((packageName) => !beforeSet.has(packageName)) || null;
 }
 
-module.exports = { AndroidController, resolveAndroidTools, parseDevices };
+module.exports = { AndroidController, resolveAndroidTools, parseDevices, buildInputArgs };
