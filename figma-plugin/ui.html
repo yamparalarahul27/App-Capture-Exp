@@ -24,6 +24,9 @@
         line-height: 1.4;
         opacity: 0.75;
       }
+      p.hint code {
+        font-size: 10px;
+      }
       textarea {
         flex: 1;
         resize: none;
@@ -83,8 +86,10 @@
   </head>
   <body>
     <p class="hint">
-      Paste the contents of <strong>layout.json</strong> (the desktop app's
-      "Copy Layout JSON" button), or load the file, then Build.
+      Paste <strong>layout.json</strong> (auto-layout) here, or
+      <strong>Load file…</strong> — either <code>layout.json</code> or
+      <code>figma-import.json</code> (screenshot + overlay). The file type is
+      detected automatically.
     </p>
     <textarea id="json" placeholder="Paste layout.json here…" spellcheck="false"></textarea>
     <div class="row">
@@ -106,14 +111,48 @@
         statusEl.className = kind || "";
       }
 
-      document.getElementById("buildBtn").onclick = () => {
-        const json = jsonEl.value.trim();
-        if (!json) {
-          setStatus("Paste layout.json first.", "error");
+      // Route a parsed object to the right plugin message.
+      function dispatch(parsed) {
+        if (parsed && parsed.format === "app-capture-figma-import") {
+          const payload = {
+            packageName: parsed.packageName,
+            capturedAt: parsed.capturedAt,
+            dimensions: parsed.dimensions,
+            nodes: Array.isArray(parsed.nodes) ? parsed.nodes : []
+          };
+          const imageBytes = parsed.image ? dataUrlToBytes(parsed.image) : null;
+          setStatus("Building screenshot capture…", "");
+          parent.postMessage(
+            { pluginMessage: { type: "import", payload, image: imageBytes } },
+            "*"
+          );
           return;
         }
-        setStatus("Building…", "");
-        parent.postMessage({ pluginMessage: { type: "build", json } }, "*");
+        if (parsed && parsed.root) {
+          setStatus("Building auto-layout…", "");
+          parent.postMessage(
+            { pluginMessage: { type: "build", json: parsed } },
+            "*"
+          );
+          return;
+        }
+        setStatus('Unrecognised file: expected layout.json ("root") or figma-import.json ("format").', "error");
+      }
+
+      document.getElementById("buildBtn").onclick = () => {
+        const raw = jsonEl.value.trim();
+        if (!raw) {
+          setStatus("Paste a layout.json or load a file first.", "error");
+          return;
+        }
+        let parsed;
+        try {
+          parsed = JSON.parse(raw);
+        } catch (e) {
+          setStatus("Invalid JSON: " + e.message, "error");
+          return;
+        }
+        dispatch(parsed);
       };
 
       document.getElementById("closeBtn").onclick = () => {
@@ -134,9 +173,19 @@
       onmessage = (event) => {
         const msg = event.data.pluginMessage;
         if (!msg) return;
-        if (msg.type === "done") setStatus(`Built "${msg.name}". ✓`, "ok");
+        if (msg.type === "done") setStatus(`Done: "${msg.name}". ✓`, "ok");
         if (msg.type === "error") setStatus(msg.message, "error");
       };
+
+      function dataUrlToBytes(dataUrl) {
+        const base64 = dataUrl.split(",")[1] || "";
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+      }
     </script>
   </body>
 </html>
