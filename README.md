@@ -15,16 +15,31 @@ Each capture contains:
 - `screen.png`: exact Android screenshot.
 - `hierarchy.xml`: Android UI hierarchy from `uiautomator`.
 - `figma-capture.svg`: screenshot plus editable accessibility text/click-target overlays.
+- `layout.json`: a Figma layout spec (frames + text with inferred auto-layout) for the importer plugin.
 - `capture.json`: parsed capture metadata.
 - `figma-import.json`: self-contained payload for the companion Figma plugin.
 
-## Two Ways Into Figma
+## Ways Into Figma
 
-- **Copy SVG → paste** (fastest): a flat screenshot with overlay text/target layers.
-- **Figma plugin** (highest fidelity): rebuilds a real frame sized to the device,
-  with the screenshot as an image fill, editable text layers, and grouped
-  tap-target rectangles. See [`figma-plugin/README.md`](figma-plugin/README.md)
-  for install and usage.
+| Route | Output | Editable? | Auto-layout? | How |
+| --- | --- | --- | --- | --- |
+| SVG paste | `figma-capture.svg` | Yes (vectors + text) | No (absolute positions) | **Copy SVG** → paste into Figma |
+| Plugin — screenshot | `figma-import.json` | Yes (text + tap-target layers over a screenshot image fill) | No | Load into the importer plugin |
+| Plugin — auto-layout | `layout.json` | Yes (real frames + text) | **Yes** | **Copy Layout JSON** → paste into the importer plugin |
+
+Figma's native editable format can't be written directly from outside, so
+auto-layout is delivered through a plugin rather than the clipboard. The
+companion plugin reads either `figma-import.json` or `layout.json` (auto-detected).
+See [`figma-plugin/`](./figma-plugin/) for install + usage and the JSON schema.
+
+### Image-only (no device)
+
+The same `layout.json` shape is the contract for screenshots: hand an image +
+device dimensions to a vision model (Claude/Codex), ask it to emit JSON matching
+the schema in `figma-plugin/README.md`, then paste that into the importer
+plugin. A complete hand-authored sample lives in
+[`examples/image-only-example.layout.json`](./examples/image-only-example.layout.json).
+Spacing and grouping are inferred from the image, so expect light touch-up.
 
 ## Requirements
 
@@ -115,13 +130,19 @@ The desktop UI follows macOS Human Interface Guidelines direction for sidebars, 
 
 A downloaded APK does not expose a DOM or React Native component tree. Without app instrumentation, this app cannot recover exact native styles as editable Figma nodes.
 
-The MVP output is therefore:
+The output is therefore:
 
 ```text
 exact screenshot
 + accessible text layers
 + clickable/focusable bounds
++ layout.json (frames + text + inferred auto-layout)
 + capture metadata
 ```
 
-That gives you something pasteable and useful in Figma today, while leaving a clean path for a future Figma plugin or OCR/CV pass.
+When the device exposes a hierarchy, `layout.json` carries real bounds, text,
+and inferred auto-layout into editable Figma nodes via the importer plugin.
+Colors and exact native styles are not present in the hierarchy, so frame fills
+default to neutral placeholders and are easy to adjust in Figma. For
+screenshots with no hierarchy, generate `layout.json` from the image with a
+vision model against the documented schema.

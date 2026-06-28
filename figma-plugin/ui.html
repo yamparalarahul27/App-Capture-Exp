@@ -3,107 +3,182 @@
   <head>
     <meta charset="utf-8" />
     <style>
-      :root { color-scheme: light dark; }
+      :root {
+        color-scheme: light dark;
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
       body {
         margin: 0;
-        padding: 16px;
-        font: 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        color: #1c1c1e;
-        background: #fff;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        height: 100vh;
+        box-sizing: border-box;
+        background: var(--figma-color-bg, #fff);
+        color: var(--figma-color-text, #1d1d1f);
       }
-      @media (prefers-color-scheme: dark) {
-        body { color: #f5f5f7; background: #2c2c2e; }
-        .drop { border-color: #555; }
+      p.hint {
+        margin: 0;
+        font-size: 11px;
+        line-height: 1.4;
+        opacity: 0.75;
       }
-      h1 { margin: 0 0 4px; font-size: 13px; }
-      p.hint { margin: 0 0 12px; opacity: 0.7; }
-      .drop {
-        display: block;
-        border: 1px dashed #c4c4c6;
+      p.hint code {
+        font-size: 10px;
+      }
+      textarea {
+        flex: 1;
+        resize: none;
+        width: 100%;
+        box-sizing: border-box;
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 11px;
+        line-height: 1.4;
+        padding: 8px;
         border-radius: 8px;
-        padding: 14px;
-        text-align: center;
-        cursor: pointer;
+        border: 1px solid var(--figma-color-border, #e6e6e6);
+        background: var(--figma-color-bg-secondary, #f5f5f5);
+        color: inherit;
       }
-      .row { display: flex; gap: 8px; margin-top: 12px; }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
       button {
         flex: 1;
-        min-height: 30px;
-        border: 1px solid transparent;
-        border-radius: 6px;
-        font: inherit;
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: none;
+        font-size: 12px;
+        font-weight: 600;
         cursor: pointer;
       }
-      #import { background: #0d99ff; color: #fff; }
-      #import:disabled { background: #9bd0ff; cursor: not-allowed; }
-      #cancel { background: transparent; border-color: #c4c4c6; color: inherit; }
-      #status { margin-top: 10px; min-height: 16px; opacity: 0.8; }
+      button.primary {
+        background: #0d99ff;
+        color: #fff;
+      }
+      button.secondary {
+        background: var(--figma-color-bg-secondary, #ececec);
+        color: inherit;
+      }
+      label.file {
+        font-size: 11px;
+        opacity: 0.85;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      input[type="file"] {
+        display: none;
+      }
+      #status {
+        font-size: 11px;
+        min-height: 14px;
+      }
+      #status.error {
+        color: #e5484d;
+      }
+      #status.ok {
+        color: #30a46c;
+      }
     </style>
   </head>
   <body>
-    <h1>App Capture Import</h1>
-    <p class="hint">Select the <code>figma-import.json</code> exported by App Capture.</p>
-
-    <label class="drop">
-      <input id="file" type="file" accept="application/json,.json" hidden />
-      <span id="fileLabel">Choose figma-import.json</span>
-    </label>
-
+    <p class="hint">
+      Paste <strong>layout.json</strong> (auto-layout) here, or
+      <strong>Load file…</strong> — either <code>layout.json</code> or
+      <code>figma-import.json</code> (screenshot + overlay). The file type is
+      detected automatically.
+    </p>
+    <textarea id="json" placeholder="Paste layout.json here…" spellcheck="false"></textarea>
     <div class="row">
-      <button id="import" disabled>Import</button>
-      <button id="cancel">Cancel</button>
+      <label class="file" for="file">📂 Load file…</label>
+      <input type="file" id="file" accept="application/json,.json" />
     </div>
     <div id="status"></div>
+    <div class="row">
+      <button class="secondary" id="closeBtn">Close</button>
+      <button class="primary" id="buildBtn">Build in Figma</button>
+    </div>
 
     <script>
-      let payload = null;
-      let imageBytes = null;
-
-      const fileEl = document.getElementById("file");
-      const fileLabel = document.getElementById("fileLabel");
-      const importBtn = document.getElementById("import");
+      const jsonEl = document.getElementById("json");
       const statusEl = document.getElementById("status");
 
-      fileEl.addEventListener("change", () => {
-        const file = fileEl.files && fileEl.files[0];
+      function setStatus(message, kind) {
+        statusEl.textContent = message || "";
+        statusEl.className = kind || "";
+      }
+
+      // Route a parsed object to the right plugin message.
+      function dispatch(parsed) {
+        if (parsed && parsed.format === "app-capture-figma-import") {
+          const payload = {
+            packageName: parsed.packageName,
+            capturedAt: parsed.capturedAt,
+            dimensions: parsed.dimensions,
+            nodes: Array.isArray(parsed.nodes) ? parsed.nodes : []
+          };
+          const imageBytes = parsed.image ? dataUrlToBytes(parsed.image) : null;
+          setStatus("Building screenshot capture…", "");
+          parent.postMessage(
+            { pluginMessage: { type: "import", payload, image: imageBytes } },
+            "*"
+          );
+          return;
+        }
+        if (parsed && parsed.root) {
+          setStatus("Building auto-layout…", "");
+          parent.postMessage(
+            { pluginMessage: { type: "build", json: parsed } },
+            "*"
+          );
+          return;
+        }
+        setStatus('Unrecognised file: expected layout.json ("root") or figma-import.json ("format").', "error");
+      }
+
+      document.getElementById("buildBtn").onclick = () => {
+        const raw = jsonEl.value.trim();
+        if (!raw) {
+          setStatus("Paste a layout.json or load a file first.", "error");
+          return;
+        }
+        let parsed;
+        try {
+          parsed = JSON.parse(raw);
+        } catch (e) {
+          setStatus("Invalid JSON: " + e.message, "error");
+          return;
+        }
+        dispatch(parsed);
+      };
+
+      document.getElementById("closeBtn").onclick = () => {
+        parent.postMessage({ pluginMessage: { type: "close" } }, "*");
+      };
+
+      document.getElementById("file").onchange = (event) => {
+        const file = event.target.files[0];
         if (!file) return;
-        fileLabel.textContent = file.name;
         const reader = new FileReader();
         reader.onload = () => {
-          try {
-            const parsed = JSON.parse(reader.result);
-            payload = {
-              packageName: parsed.packageName,
-              capturedAt: parsed.capturedAt,
-              dimensions: parsed.dimensions,
-              nodes: Array.isArray(parsed.nodes) ? parsed.nodes : []
-            };
-            imageBytes = parsed.image ? dataUrlToBytes(parsed.image) : null;
-            importBtn.disabled = false;
-            statusEl.textContent = payload.nodes.length + " nodes ready";
-          } catch (error) {
-            payload = null;
-            importBtn.disabled = true;
-            statusEl.textContent = "Invalid file: " + error.message;
-          }
+          jsonEl.value = reader.result;
+          setStatus(`Loaded ${file.name}`, "ok");
         };
         reader.readAsText(file);
-      });
+      };
 
-      importBtn.addEventListener("click", () => {
-        if (!payload) return;
-        parent.postMessage(
-          { pluginMessage: { type: "import", payload: payload, image: imageBytes } },
-          "*"
-        );
-      });
-
-      document.getElementById("cancel").addEventListener("click", () => {
-        parent.postMessage({ pluginMessage: { type: "cancel" } }, "*");
-      });
+      onmessage = (event) => {
+        const msg = event.data.pluginMessage;
+        if (!msg) return;
+        if (msg.type === "done") setStatus(`Done: "${msg.name}". ✓`, "ok");
+        if (msg.type === "error") setStatus(msg.message, "error");
+      };
 
       function dataUrlToBytes(dataUrl) {
-        const base64 = (dataUrl.split(",")[1] || "");
+        const base64 = dataUrl.split(",")[1] || "";
         const binary = atob(base64);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) {

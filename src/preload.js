@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld("appCapture", {
   onScrcpyError: (handler) => subscribe("scrcpy:error", handler),
   onScrcpyClosed: (handler) => subscribe("scrcpy:closed", handler),
   copySvg: (svg) => ipcRenderer.invoke("clipboard:copy-svg", svg),
+  copyJson: (json) => ipcRenderer.invoke("clipboard:copy-json", json),
   copyPng: (filePath) => ipcRenderer.invoke("clipboard:copy-png", filePath),
   showFile: (filePath) => ipcRenderer.invoke("file:show", filePath)
 });

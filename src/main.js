@@ -229,6 +229,15 @@ ipcMain.handle("clipboard:copy-svg", async (_event, svg) => {
   }
 });
 
+ipcMain.handle("clipboard:copy-json", async (_event, json) => {
+  try {
+    clipboard.writeText(json);
+    return { ok: true };
+  } catch (error) {
+    return wrapError(error);
+  }
+});
+
 ipcMain.handle("clipboard:copy-png", async (_event, filePath) => {
   try {
     const image = nativeImage.createFromPath(filePath);

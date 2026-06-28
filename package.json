@@ -7,7 +7,7 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test",
-    "check": "node --check src/main.js && node --check src/android.js && node --check src/exporter.js && node --check src/scrcpy.js && node --check src/preload.js && node --check src/renderer/renderer.js && node --check figma-plugin/code.js"
+    "check": "node --check src/main.js && node --check src/android.js && node --check src/exporter.js && node --check src/layout.js && node --check src/scrcpy.js && node --check src/preload.js && node --check src/renderer/renderer.js && node --check figma-plugin/code.js"
   },
   "devDependencies": {
     "electron": "^42.5.0"

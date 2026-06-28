@@ -1,5 +1,6 @@
 const fs = require("fs/promises");
 const path = require("path");
+const { buildLayoutSpec } = require("./layout");
 
 async function createExportBundle({ capture, outputRoot, packageName }) {
   const timestamp = toFileTimestamp(new Date(capture.capturedAt || Date.now()));
@@ -17,11 +18,19 @@ async function createExportBundle({ capture, outputRoot, packageName }) {
     packageName,
     capturedAt: capture.capturedAt
   });
+  const layoutSpec = buildLayoutSpec({
+    xml: capture.hierarchyXml,
+    dimensions,
+    packageName,
+    capturedAt: capture.capturedAt
+  });
+  const layoutJson = JSON.stringify(layoutSpec, null, 2);
 
   const screenshotPath = path.join(outputDir, "screen.png");
   const hierarchyPath = path.join(outputDir, "hierarchy.xml");
   const svgPath = path.join(outputDir, "figma-capture.svg");
   const jsonPath = path.join(outputDir, "capture.json");
+  const layoutPath = path.join(outputDir, "layout.json");
   const figmaImportPath = path.join(outputDir, "figma-import.json");
 
   const figmaImport = buildFigmaImport({
@@ -35,6 +44,7 @@ async function createExportBundle({ capture, outputRoot, packageName }) {
   await fs.writeFile(screenshotPath, capture.screenshotPng);
   await fs.writeFile(hierarchyPath, capture.hierarchyXml || "", "utf8");
   await fs.writeFile(svgPath, svg, "utf8");
+  await fs.writeFile(layoutPath, layoutJson, "utf8");
   await fs.writeFile(jsonPath, JSON.stringify({
     packageName,
     capturedAt: capture.capturedAt,
@@ -50,8 +60,11 @@ async function createExportBundle({ capture, outputRoot, packageName }) {
     hierarchyPath,
     svgPath,
     jsonPath,
+    layoutPath,
     figmaImportPath,
     svg,
+    layoutJson,
+    layoutSpec,
     screenshotDataUrl: `data:image/png;base64,${capture.screenshotPng.toString("base64")}`,
     dimensions,
     nodes
