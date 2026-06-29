@@ -38,6 +38,26 @@ npm install
 npm start
 ```
 
+> If your shell exports `ELECTRON_RUN_AS_NODE=1`, the Electron binary runs as
+> plain Node and `require("electron")` returns a path string instead of the
+> API (every API such as `app` and `nativeTheme` becomes `undefined`, crashing
+> at startup). Launch with it cleared:
+>
+> ```bash
+> unset ELECTRON_RUN_AS_NODE && npm start
+> ```
+
+## Troubleshooting
+
+- **`adb was not found` / `Android Emulator was not found`** — the Android SDK
+  is not installed or not discoverable. Install Android Studio
+  (`brew install --cask android-studio`) and complete the **Standard** setup
+  wizard, which installs `platform-tools` (`adb`) and the emulator to
+  `~/Library/Android/sdk`. If the SDK lives elsewhere, set `ANDROID_HOME` or
+  `ANDROID_SDK_ROOT` to that path.
+- **No AVDs listed** — create one in Android Studio via
+  **More Actions → Virtual Device Manager → Create Virtual Device**.
+
 ## Workflow
 
 1. Start the app.

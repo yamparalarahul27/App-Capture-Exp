@@ -5,7 +5,6 @@ const { AndroidController } = require("./android");
 const { createExportBundle } = require("./exporter");
 
 const android = new AndroidController();
-nativeTheme.themeSource = "dark";
 
 function createWindow() {
   const macWindowOptions = process.platform === "darwin"
@@ -48,6 +47,7 @@ function wrapError(error) {
 }
 
 app.whenReady().then(() => {
+  nativeTheme.themeSource = "dark";
   createWindow();
 
   app.on("activate", () => {
