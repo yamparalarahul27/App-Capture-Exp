@@ -7,7 +7,6 @@ const { ScrcpySession, avcCodecString } = require("./scrcpy");
 
 const android = new AndroidController();
 let scrcpySession = null;
-nativeTheme.themeSource = "dark";
 
 function createWindow() {
   const macWindowOptions = process.platform === "darwin"
@@ -61,6 +60,7 @@ function wrapError(error) {
 }
 
 app.whenReady().then(() => {
+  nativeTheme.themeSource = "dark";
   createWindow();
 
   app.on("activate", () => {
