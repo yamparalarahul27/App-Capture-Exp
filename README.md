@@ -1,6 +1,6 @@
 # App Capture
 
-Local macOS desktop app for running a downloaded Android APK in an emulator, capturing the current screen, and exporting a Figma-pasteable SVG bundle.
+Local desktop app for running a downloaded Android APK in an emulator, capturing the current screen, and exporting a Figma-pasteable SVG bundle. Built on Electron; the macOS UI follows Apple's Human Interface Guidelines, and tool discovery works on macOS, Linux, and Windows.
 
 ## What It Builds
 
@@ -15,11 +15,35 @@ Each capture contains:
 - `screen.png`: exact Android screenshot.
 - `hierarchy.xml`: Android UI hierarchy from `uiautomator`.
 - `figma-capture.svg`: screenshot plus editable accessibility text/click-target overlays.
+- `layout.json`: a Figma layout spec (frames + text with inferred auto-layout) for the importer plugin.
 - `capture.json`: parsed capture metadata.
+- `figma-import.json`: self-contained payload for the companion Figma plugin.
+
+## Ways Into Figma
+
+| Route | Output | Editable? | Auto-layout? | How |
+| --- | --- | --- | --- | --- |
+| SVG paste | `figma-capture.svg` | Yes (vectors + text) | No (absolute positions) | **Copy SVG** → paste into Figma |
+| Plugin — screenshot | `figma-import.json` | Yes (text + tap-target layers over a screenshot image fill) | No | Load into the importer plugin |
+| Plugin — auto-layout | `layout.json` | Yes (real frames + text) | **Yes** | **Copy Layout JSON** → paste into the importer plugin |
+
+Figma's native editable format can't be written directly from outside, so
+auto-layout is delivered through a plugin rather than the clipboard. The
+companion plugin reads either `figma-import.json` or `layout.json` (auto-detected).
+See [`figma-plugin/`](./figma-plugin/) for install + usage and the JSON schema.
+
+### Image-only (no device)
+
+The same `layout.json` shape is the contract for screenshots: hand an image +
+device dimensions to a vision model (Claude/Codex), ask it to emit JSON matching
+the schema in `figma-plugin/README.md`, then paste that into the importer
+plugin. A complete hand-authored sample lives in
+[`examples/image-only-example.layout.json`](./examples/image-only-example.layout.json).
+Spacing and grouping are inferred from the image, so expect light touch-up.
 
 ## Requirements
 
-- macOS
+- macOS, Linux, or Windows
 - Node.js 22+
 - Android Studio or Android SDK command-line tools
 - At least one Android Virtual Device
@@ -28,7 +52,9 @@ The app searches for Android tools in:
 
 - `$ANDROID_HOME`
 - `$ANDROID_SDK_ROOT`
-- `~/Library/Android/sdk`
+- `~/Library/Android/sdk` (macOS)
+- `~/Android/Sdk` (Linux)
+- `%LOCALAPPDATA%\Android\Sdk` (Windows)
 - current `PATH`
 
 ## Run
@@ -47,14 +73,21 @@ npm start
 > unset ELECTRON_RUN_AS_NODE && npm start
 > ```
 
+## Develop
+
+```bash
+npm run check   # syntax-check every source file
+npm test        # run the unit tests (node --test)
+```
+
 ## Troubleshooting
 
 - **`adb was not found` / `Android Emulator was not found`** — the Android SDK
   is not installed or not discoverable. Install Android Studio
   (`brew install --cask android-studio`) and complete the **Standard** setup
   wizard, which installs `platform-tools` (`adb`) and the emulator to
-  `~/Library/Android/sdk`. If the SDK lives elsewhere, set `ANDROID_HOME` or
-  `ANDROID_SDK_ROOT` to that path.
+  `~/Library/Android/sdk` (macOS). If the SDK lives elsewhere, set `ANDROID_HOME`
+  or `ANDROID_SDK_ROOT` to that path.
 - **No AVDs listed** — create one in Android Studio via
   **More Actions → Virtual Device Manager → Create Virtual Device**.
 
@@ -65,12 +98,33 @@ npm start
 3. Start an AVD or select a connected emulator/device.
 4. Install the APK.
 5. Launch the detected package.
-6. Use the emulator normally.
+6. Click `Live` to mirror the device inside the app and control it with the
+   mouse (click to tap, drag to swipe/scroll). See "Live Engines" below.
 7. Click `Capture`.
 8. Click `Copy SVG`.
 9. Paste into a Figma Design file.
 
 You can also use `Copy PNG` for an exact bitmap capture.
+
+## Live Engines
+
+`Live` mirrors the device inside Appu so you can drive the app without leaving
+the window. Two engines are used automatically:
+
+- **scrcpy** (preferred): real-time H.264 video decoded with WebCodecs, with
+  full mouse control (tap, drag, scroll). Works for emulators and real phones.
+  Requires a scrcpy server jar. The app looks for it via, in order:
+  - `SCRCPY_SERVER_JAR` (explicit path)
+  - `~/.appu/scrcpy-server.jar`
+  - a Homebrew/Linux scrcpy install (`.../share/scrcpy/scrcpy-server`)
+
+  Install with `brew install scrcpy` (macOS) or your package manager. The server
+  version must match; the app auto-detects it from an installed `scrcpy`, or set
+  `SCRCPY_SERVER_VERSION`.
+- **screencap** (fallback): if scrcpy isn't available, Appu falls back to polled
+  `adb exec-out screencap` frames (~1 fps) with tap/swipe forwarding.
+
+The scrcpy engine is experimental and pinned to the v2.x server protocol.
 
 ## How The Capture Works
 
@@ -96,13 +150,19 @@ The desktop UI follows macOS Human Interface Guidelines direction for sidebars, 
 
 A downloaded APK does not expose a DOM or React Native component tree. Without app instrumentation, this app cannot recover exact native styles as editable Figma nodes.
 
-The MVP output is therefore:
+The output is therefore:
 
 ```text
 exact screenshot
 + accessible text layers
 + clickable/focusable bounds
++ layout.json (frames + text + inferred auto-layout)
 + capture metadata
 ```
 
-That gives you something pasteable and useful in Figma today, while leaving a clean path for a future Figma plugin or OCR/CV pass.
+When the device exposes a hierarchy, `layout.json` carries real bounds, text,
+and inferred auto-layout into editable Figma nodes via the importer plugin.
+Colors and exact native styles are not present in the hierarchy, so frame fills
+default to neutral placeholders and are easy to adjust in Figma. For
+screenshots with no hierarchy, generate `layout.json` from the image with a
+vision model against the documented schema.

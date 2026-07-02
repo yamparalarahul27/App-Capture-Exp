@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "source": "manual",
+  "name": "Sign in (image-only example)",
+  "device": { "width": 393, "height": 852 },
+  "root": {
+    "type": "FRAME",
+    "name": "Sign in",
+    "x": 0,
+    "y": 0,
+    "width": 393,
+    "height": 852,
+    "fills": [{ "type": "SOLID", "color": "#FFFFFF" }],
+    "cornerRadius": 0,
+    "layout": {
+      "mode": "VERTICAL",
+      "paddingTop": 96,
+      "paddingRight": 24,
+      "paddingBottom": 24,
+      "paddingLeft": 24,
+      "itemSpacing": 16,
+      "primaryAxisAlignItems": "MIN",
+      "counterAxisAlignItems": "MIN"
+    },
+    "children": [
+      {
+        "type": "TEXT",
+        "name": "Heading",
+        "x": 24,
+        "y": 96,
+        "width": 345,
+        "height": 40,
+        "characters": "Welcome back",
+        "fontSize": 32,
+        "fontWeight": 700,
+        "color": "#1D1D1F",
+        "textAlign": "LEFT"
+      },
+      {
+        "type": "TEXT",
+        "name": "Subheading",
+        "x": 24,
+        "y": 152,
+        "width": 345,
+        "height": 22,
+        "characters": "Sign in to continue",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "color": "#6E6E73",
+        "textAlign": "LEFT"
+      },
+      {
+        "type": "FRAME",
+        "name": "Email field",
+        "x": 24,
+        "y": 198,
+        "width": 345,
+        "height": 52,
+        "fills": [{ "type": "SOLID", "color": "#F2F2F7" }],
+        "cornerRadius": 12,
+        "layout": {
+          "mode": "HORIZONTAL",
+          "paddingTop": 15,
+          "paddingRight": 16,
+          "paddingBottom": 15,
+          "paddingLeft": 16,
+          "itemSpacing": 8,
+          "primaryAxisAlignItems": "MIN",
+          "counterAxisAlignItems": "CENTER"
+        },
+        "children": [
+          {
+            "type": "TEXT",
+            "name": "Email placeholder",
+            "x": 16,
+            "y": 15,
+            "width": 200,
+            "height": 22,
+            "characters": "Email address",
+            "fontSize": 16,
+            "fontWeight": 400,
+            "color": "#8E8E93",
+            "textAlign": "LEFT"
+          }
+        ]
+      },
+      {
+        "type": "FRAME",
+        "name": "Password field",
+        "x": 24,
+        "y": 266,
+        "width": 345,
+        "height": 52,
+        "fills": [{ "type": "SOLID", "color": "#F2F2F7" }],
+        "cornerRadius": 12,
+        "layout": {
+          "mode": "HORIZONTAL",
+          "paddingTop": 15,
+          "paddingRight": 16,
+          "paddingBottom": 15,
+          "paddingLeft": 16,
+          "itemSpacing": 8,
+          "primaryAxisAlignItems": "MIN",
+          "counterAxisAlignItems": "CENTER"
+        },
+        "children": [
+          {
+            "type": "TEXT",
+            "name": "Password placeholder",
+            "x": 16,
+            "y": 15,
+            "width": 200,
+            "height": 22,
+            "characters": "Password",
+            "fontSize": 16,
+            "fontWeight": 400,
+            "color": "#8E8E93",
+            "textAlign": "LEFT"
+          }
+        ]
+      },
+      {
+        "type": "FRAME",
+        "name": "Sign in button",
+        "x": 24,
+        "y": 334,
+        "width": 345,
+        "height": 52,
+        "fills": [{ "type": "SOLID", "color": "#0A84FF" }],
+        "cornerRadius": 12,
+        "layout": {
+          "mode": "HORIZONTAL",
+          "paddingTop": 15,
+          "paddingRight": 16,
+          "paddingBottom": 15,
+          "paddingLeft": 16,
+          "itemSpacing": 8,
+          "primaryAxisAlignItems": "CENTER",
+          "counterAxisAlignItems": "CENTER"
+        },
+        "children": [
+          {
+            "type": "TEXT",
+            "name": "Button label",
+            "x": 150,
+            "y": 15,
+            "width": 60,
+            "height": 22,
+            "characters": "Sign in",
+            "fontSize": 16,
+            "fontWeight": 600,
+            "color": "#FFFFFF",
+            "textAlign": "CENTER"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -3,8 +3,10 @@ const path = require("path");
 const fs = require("fs/promises");
 const { AndroidController } = require("./android");
 const { createExportBundle } = require("./exporter");
+const { ScrcpySession, avcCodecString } = require("./scrcpy");
 
 const android = new AndroidController();
+let scrcpySession = null;
 
 function createWindow() {
   const macWindowOptions = process.platform === "darwin"
@@ -39,6 +41,17 @@ function getCaptureRoot() {
   return path.join(app.getPath("documents"), "App Capture", "Captures");
 }
 
+async function stopScrcpy() {
+  if (!scrcpySession) return;
+  const session = scrcpySession;
+  scrcpySession = null;
+  try {
+    await session.stop();
+  } catch {
+    // best effort cleanup
+  }
+}
+
 function wrapError(error) {
   return {
     ok: false,
@@ -56,7 +69,12 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
+  stopScrcpy();
   if (process.platform !== "darwin") app.quit();
+});
+
+app.on("before-quit", () => {
+  stopScrcpy();
 });
 
 ipcMain.handle("system:status", async () => {
@@ -121,6 +139,69 @@ ipcMain.handle("android:launch-app", async (_event, payload) => {
   }
 });
 
+ipcMain.handle("scrcpy:start", async (event, payload) => {
+  try {
+    await stopScrcpy();
+    const tools = await android.getStatus();
+    if (!tools.adb.found) throw new Error("adb not found.");
+
+    const session = new ScrcpySession({ adbPath: tools.adb.path, serial: payload.serial });
+    const sender = event.sender;
+    session.on("meta", (meta) => sender.send("scrcpy:meta", meta));
+    session.on("packet", (packet) => {
+      // Buffers cross the IPC boundary as Uint8Array; the renderer feeds them
+      // to a WebCodecs VideoDecoder.
+      const message = {
+        isConfig: packet.isConfig,
+        isKey: packet.isKey,
+        data: new Uint8Array(packet.data)
+      };
+      if (packet.isConfig) message.codec = avcCodecString(packet.data);
+      sender.send("scrcpy:packet", message);
+    });
+    session.on("error", (error) => sender.send("scrcpy:error", String(error && error.message || error)));
+    session.on("closed", () => sender.send("scrcpy:closed"));
+
+    const info = await session.start(payload);
+    scrcpySession = session;
+    return { ok: true, info };
+  } catch (error) {
+    await stopScrcpy();
+    return wrapError(error);
+  }
+});
+
+ipcMain.handle("scrcpy:stop", async () => {
+  await stopScrcpy();
+  return { ok: true };
+});
+
+ipcMain.handle("scrcpy:touch", async (_event, event) => {
+  try {
+    if (scrcpySession) scrcpySession.sendTouch(event);
+    return { ok: true };
+  } catch (error) {
+    return wrapError(error);
+  }
+});
+
+ipcMain.handle("android:capture-frame", async (_event, payload) => {
+  try {
+    const png = await android.captureFrame(payload);
+    return { ok: true, dataUrl: `data:image/png;base64,${png.toString("base64")}` };
+  } catch (error) {
+    return wrapError(error);
+  }
+});
+
+ipcMain.handle("android:input", async (_event, payload) => {
+  try {
+    return { ok: true, result: await android.input(payload) };
+  } catch (error) {
+    return wrapError(error);
+  }
+});
+
 ipcMain.handle("android:capture", async (_event, payload) => {
   try {
     const capture = await android.capture(payload);
@@ -138,10 +219,19 @@ ipcMain.handle("android:capture", async (_event, payload) => {
 
 ipcMain.handle("clipboard:copy-svg", async (_event, svg) => {
   try {
-    clipboard.write({
-      text: svg,
-      html: svg
-    });
+    // Figma (and most vector tools) create editable layers from SVG *source*
+    // pasted as plain text. Writing the same markup to the HTML clipboard makes
+    // some paste targets render it as escaped source instead, so keep text only.
+    clipboard.writeText(svg);
+    return { ok: true };
+  } catch (error) {
+    return wrapError(error);
+  }
+});
+
+ipcMain.handle("clipboard:copy-json", async (_event, json) => {
+  try {
+    clipboard.writeText(json);
     return { ok: true };
   } catch (error) {
     return wrapError(error);
